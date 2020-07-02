@@ -69,10 +69,6 @@ class MyAgent(mp.Process):
 		obs, depth, instruction_, att = env.reset()
 		instruction = instruction_
 		instruction_embedding = self.lnet.get_embedding(instruction_, 1).detach()
-		#extra_ch = (instruction_[-1] - 20).view(1, 1, 1, 1).repeat(1, 1, 84, 84).type(torch.FloatTensor)
-		#obs = torch.cat((obs, extra_ch), dim=1)
-		#obs = obs ** (instruction_[-1] - 18).type(torch.FloatTensor)
-		#obs = obs if instruction_[att] == 2 else obs ** (instruction_[att] - 18).type(torch.FloatTensor)
 
 		for p in self.lnet.parameters():
 			p.requires_grad = False
@@ -83,21 +79,9 @@ class MyAgent(mp.Process):
 
 			action, h_, h_dir_, logits = self.step(reward, obs, h_, h_dir_, instruction_embedding, torch.ones((1)).type(torch.FloatTensor) if instruction_[att] == 2 else (instruction_[att] - 18).type(torch.FloatTensor))
 			reward, obs_, depth_, att_ = env.env_step(action)
-			#extra_ch = (instruction_[-1] - 20).view(1, 1, 1, 1).repeat(1, 1, 84, 84).type(torch.FloatTensor)
-			#obs_ = torch.cat((obs_, extra_ch), dim=1)
-			# obs_ = obs_ ** (instruction_[-1] - 18).type(torch.FloatTensor)
-			#obs_ = obs_ if instruction_[att_] == 2 else obs_ ** (instruction_[att_] - 18).type(torch.FloatTensor)
-			#if instruction[1] == 21:
-			#	reward = 0.01 if action == 2 else -0.01
-			#else:
-			#	reward = 0.01 if action == 1 else -0.01
 
 			if reward == 1 or reward < 0 or n_step % 900 == 0:
 				obs_, depth_, instruction_, att_ = env.reset()
-				#extra_ch = (instruction_[-1] - 20).view(1, 1, 1, 1).repeat(1, 1, 84, 84).type(torch.FloatTensor)
-				#obs_ = torch.cat((obs_, extra_ch), dim=1)
-				# obs_ = obs_ ** (instruction_[-1] - 18).type(torch.FloatTensor)
-				#obs_ = obs_ if instruction_[att_] == 2 else obs_ ** (instruction_[att_] - 18).type(torch.FloatTensor)
 				instruction_embedding = self.lnet.get_embedding(instruction_, 1).detach()
 				reward = -1 if reward < 0 else reward
 				if n_step % 900 == 0:

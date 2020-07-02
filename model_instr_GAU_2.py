@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from IMPALA_INSTR_ATT.model_instr_dir import Net as NetDir
 
+
 CHANNELS = 3
 
 D1 = 16
@@ -12,9 +13,7 @@ DL = 256
 DR = 256
 DI = 256
 
-#NEW_SIZE = 196
 NEW_SIZE = 81
-#NEW_SIZE = 70
 
 MAX_LENGTH = 50
 
@@ -44,17 +43,15 @@ class Net(nn.Module):
 
 		self.distribution = torch.distributions.Categorical
 
-	def forward(self, x, h, h_dir, instruction, att, depth=None, actor=False, seq_lengths=None):
+	def forward(self, x, h, h_dir, instruction, att, actor=False, seq_lengths=None):
 
 		x_84 = F.adaptive_avg_pool2d(x.view(-1, CHANNELS, x.shape[-2], x.shape[-1]), 84)
 
 		h_dir, self.direct = self.net_dir(x_84, h_dir, instruction, actor, seq_lengths)
 
-		#####################################################################################################
-
-		#x_84 = x_84 ** att.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-		att = (torch.argmax(self.direct, -1) + 1).type(torch.FloatTensor).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-		x_84 = x_84 ** att if actor and False else x_84 ** att.cuda()
+		if att is None:
+			att = (torch.argmax(self.direct, -1) + 1).type(torch.FloatTensor).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+		x_84 = x_84 ** att.cuda()
 
 		x1 = self.bnc1(F.relu(self.drop1(self.conv1(x_84))))
 
@@ -73,10 +70,7 @@ class Net(nn.Module):
 		logits = x5[:, :, :self.a_dim]
 		values = x5[:, :, -1].view(s0, s1)
 
-		if depth is not None:
-			return logits.squeeze(), values, h, h_dir, None, None, self.direct
-
-		return logits.squeeze(), values, h, h_dir, None, x2, x3
+		return logits.squeeze(), values, h, h_dir, None, None, self.direct
 
 	def get_embedding(self, instruction, bs, seq_lengths=None):
 		return self.net_dir.get_embedding(instruction, bs, seq_lengths)
@@ -85,7 +79,6 @@ class Net(nn.Module):
 		if not train:
 			self.eval()
 		logits, values, h, h_dir, _, x2, x3 = self.forward(s, h, h_dir, instruction, att, actor=True)
-		#logits, values, h, _ = self.forward(s, h, vis_match, get_conv_out=train)
 		probs = torch.clamp(F.softmax(logits, dim=-1), 0.00001, 0.99999).data
 		m = self.distribution(probs)
 		action = m.sample().type(torch.IntTensor)

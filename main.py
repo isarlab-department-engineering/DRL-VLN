@@ -7,9 +7,7 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 if __name__ == '__main__':
-	# from IMPALA_INSTR_ATT.model_instr import Net		# CAT
-	from IMPALA_INSTR_ATT.model_instr_GAU import Net		# GAU
-	# from IMPALA_INSTR_ATT.model_instr_GAU_2 import Net		# OURS
+	from IMPALA_INSTR_ATT.model_instr_GAU_2 import Net
 	from tensorboardX import SummaryWriter
 	from IMPALA_INSTR_ATT.learner import Learner
 	from IMPALA_INSTR_ATT.my_agent import MyAgent
@@ -30,8 +28,8 @@ if __name__ == '__main__':
 	GAMMA = 0.99
 	UP_STEP = 100
 	BS = 4
-	LR = 0.0002		#0.0005
-	ENTROPY_COST = 0.001		#0.00025
+	LR = 0.0002
+	ENTROPY_COST = 0.001
 	BASELINE_COST = 0.5
 	REP_FREQ = 2
 	N_ACTIONS = 3
@@ -49,7 +47,7 @@ if __name__ == '__main__':
 	writer = SummaryWriter()
 
 	gnet = Net(N_ACTIONS, vocabulary_size, embedding_size, weights)
-	gnet.load_state_dict(torch.load('/home/andromeda/PycharmProjects/CustomUnreal/My_Agent/models/model_instruction_GAU_FINAL_3.pt'))
+	gnet.load_state_dict(torch.load('/path_to_model/model.pt'))
 
 	global_ep, wins, tot_rewards = mp.Value('i', 0), mp.Value('i', 0), mp.Value('d', 0.)
 	res_queue, queue, g_que = mp.Queue(), mp.Queue(), mp.Queue()

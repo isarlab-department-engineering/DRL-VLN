@@ -6,9 +6,6 @@ import numpy as np
 import random
 
 
-DEPTH = 1
-
-
 class Learner(mp.Process):
 	def __init__(self, g_n, que_i, que_o, n, global_ep, gamma, lr, up_step, length, bs, entropy_cost, baseline_cost, rep_freq):
 		super(Learner, self).__init__()
@@ -32,14 +29,13 @@ class Learner(mp.Process):
 		self.gnet.cuda()
 		params = self.gnet.parameters()
 		opt = torch.optim.RMSprop(params, lr=self.lr, eps=.1)
-		# opt = torch.optim.SGD(params, lr=self.lr, momentum=0, weight_decay=0)
-		# opt = torch.optim.Adam(params, lr=0.00025, eps=1e-5)
 
 		torch.manual_seed(0)
 		torch.cuda.manual_seed(0)
 		np.random.seed(0)
 		random.seed(0)
 		torch.backends.cudnn.deterministic = True
+		
 		while True:
 			n += self.bs
 			opt.zero_grad()
@@ -49,7 +45,6 @@ class Learner(mp.Process):
 				if rg is None:
 					count += 1
 					if count == self.n:
-						#torch.save(self.gnet.state_dict(), '/home/andromeda/PycharmProjects/CustomUnreal/My_Agent/models/model_instruction_att_toy_0.pt')
 						break
 				else:
 					self.gnet.cuda()
@@ -61,7 +56,7 @@ class Learner(mp.Process):
 					r = rg[5].type(torch.FloatTensor)
 					r = Learner.clip_rewards(r)
 					l = rg[6].unsqueeze(1)
-					depth = rg[7].type(torch.IntTensor).cuda() if DEPTH == 2 else rg[7].cuda()
+					depth = rg[7].cuda()
 					instruction = rg[8].cuda()
 					seq_lengths = rg[9]
 					instruction_ = rg[10].cuda()
@@ -72,7 +67,7 @@ class Learner(mp.Process):
 					directions = torch.stack([instruction[v, i] - 2 if instruction[v, i] == 2 else instruction[v, i] - 19 for i, v in enumerate(batt.squeeze().type(torch.IntTensor))], dim=0).unsqueeze(1)
 
 					self.gnet.train()
-					logits, values, h, h_dir, values_curiosity, d_pred, dir_preds = self.gnet(s, h, h_dir, instruction, directions.type(torch.FloatTensor).cuda().squeeze() + 1, depth=DEPTH, seq_lengths=seq_lengths)
+					logits, values, h, h_dir, values_curiosity, d_pred, dir_preds = self.gnet(s, h, h_dir, instruction, directions.type(torch.FloatTensor).cuda().squeeze() + 1, seq_lengths=seq_lengths)
 					logits = logits.view(-1, h.shape[1], logits.shape[-1])
 
 					self.gnet.eval()
@@ -88,33 +83,11 @@ class Learner(mp.Process):
 
 					p_, v_, c_, l_ = self.get_loss(a, pg_advantages, m, vs, values, probs)
 
-					if DEPTH == 0:
-						d_ = (d_pred - depth).pow(2).mean()
-						dl += d_
-						l_ += d_
-					elif DEPTH == 2:
-						#md = torch.distributions.Categorical(d_pred)
-						#d_ = -md.log_prob(depth.view(-1, 1)).mean() * 0.11
-						#dl += d_
-						directions = torch.stack([instruction[v, i] - 2 if instruction[v, i] == 2 else instruction[v, i] - 19 for i, v in enumerate(batt.squeeze().type(torch.IntTensor))], dim=0).unsqueeze(1)
-						md = torch.distributions.Categorical(dir_preds.unsqueeze(1))
-						d_ = -md.log_prob(directions).mean() * 1
-						#md = torch.distributions.Categorical(dir_preds.unsqueeze(1))
-						#d_ = -md.log_prob(batt.cuda()).mean() * 1
-						dl += d_
-						l_ += d_
-
-					#print(match[0], pred_match[0], -(m_match.log_prob(match) * (match*9+1).type(torch.cuda.FloatTensor))[0])
-
-					#m_ = -(m_match.log_prob(match) * (match*2+1).type(torch.cuda.FloatTensor)).mean()
-
-					#print(dl, l_)
 					pl += p_
 					vl += v_
 					cl += c_
 					loss += l_
 
-					#lr = self.poly_lr_scheduler(opt)
 					lr = self.lr
 					l_.backward()
 					l_.detach_()
@@ -146,14 +119,7 @@ class Learner(mp.Process):
 				self.queue_o.put([g.state_dict(), loss, vl, pl, cl, dl, grad_norm, lr])
 
 			if n % (10000 * self.bs / self.up_step) == 0:
-				torch.save(self.gnet.state_dict(), '/home/andromeda/PycharmProjects/CustomUnreal/My_Agent/models/model_instruction_GAU_FINAL_4.pt')
-
-	def poly_lr_scheduler(self, opt):
-		global_step = min(self.global_ep.value, self.length)
-		lr = self.lr * (1 - global_step / self.length)
-		for param_group in opt.param_groups:
-			param_group['lr'] = lr
-		return lr
+				torch.save(self.gnet.state_dict(), '/path_to_model/model.pt')
 
 	@staticmethod
 	def v_trace(probs, bl, ba, bootstrap_value, values, br, discounts):
